@@ -8,22 +8,21 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .topology { display: flex; align-items: center; justify-content: space-around; width: 950px; height: 160px; background: white; border-radius: 12px; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; position: relative; }
         .wire-bg { position: absolute; top: 50%; left: 10%; right: 10%; height: 4px; background: #bdc3c7; z-index: 1; }
-        .node { width: 100px; height: 100px; background: var(--dark); color: white; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 0.85em; z-index: 2; border: 4px solid transparent; transition: 0.3s; }
+        .node { width: 100px; height: 100px; background: var(--dark); color: white; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 0.85em; z-index: 2; border: 4px solid transparent; }
         .router-node { border-radius: 50%; width: 110px; height: 110px; }
         .active-node { border-color: #f39c12; box-shadow: 0 0 20px #f39c12; transform: scale(1.05); }
-        #inspector { width: 950px; background: white; border-radius: 10px; padding: 20px; border-top: 8px solid var(--dark); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        #inspector { width: 950px; background: white; border-radius: 10px; padding: 20px; border-top: 8px solid var(--dark); }
         .status-area { text-align: center; margin-bottom: 20px; height: 80px; }
         .pdu-title { font-size: 1.5em; font-weight: bold; color: #2980b9; }
         .header-stack { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 60px; }
-        .header-block { padding: 12px 18px; border: 2px solid #333; border-radius: 5px; font-weight: bold; animation: popIn 0.4s ease-out; }
+        .header-block { padding: 12px 18px; border: 2px solid #333; border-radius: 5px; font-weight: bold; }
         .controls { margin-top: 30px; display: flex; gap: 10px; }
         button { padding: 15px 30px; font-size: 1.2em; background: var(--dark); color: white; border: none; border-radius: 8px; cursor: pointer; }
-        #stepBtn { background: #27ae60; display: none; }
-        @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        #stepBtn { background: #27ae60; visibility: hidden; } /* Hidden until Start is pressed */
     </style>
 </head>
 <body>
-    <h1>Chapter 1: Network Flow Control</h1>
+    <h1>Manual OSI Lecture Tool</h1>
     <div class="topology">
         <div class="wire-bg"></div>
         <div class="node" id="node-pc"><strong>SENDER</strong></div>
@@ -33,23 +32,23 @@
     </div>
     <div id="inspector">
         <div class="status-area">
-            <div id="pdu-name" class="pdu-title">Manual Mode</div>
-            <div id="pdu-action">Click "Start" to begin, then use "Next Step" to lecture.</div>
+            <div id="pdu-name" class="pdu-title">Manual Control Mode</div>
+            <div id="pdu-action" style="font-weight:bold; color:#e67e22;">Waiting for you to click "START"...</div>
         </div>
         <div class="header-stack" id="packet-container"></div>
     </div>
     <div class="controls">
-        <button id="runBtn" onclick="initDemo()">Start New Demo</button>
-        <button id="stepBtn" onclick="resolveStep()">Next Step &rarr;</button>
+        <button id="runBtn" onclick="initDemo()">START SIMULATION</button>
+        <button id="stepBtn" onclick="resolveStep()">NEXT STEP &rarr;</button>
     </div>
 
     <script>
         let stepResolver;
         const layers = {
-            7: { n: 'Data', p: 'DATA', c: 'var(--app)', i: 'Application Payload' },
-            4: { n: 'L4 Header', p: 'SEGMENT', c: 'var(--trans)', i: 'TCP Port Added' },
-            3: { n: 'L3 Header', p: 'PACKET', c: 'var(--net)', i: 'IP Address Added' },
-            2: { n: 'L2 Header', p: 'FRAME', c: 'var(--link)', i: 'MAC Address Added' }
+            7: { n: 'Data', p: 'DATA', c: 'var(--app)', i: 'Layer 7: Application Data' },
+            4: { n: 'L4 Header', p: 'SEGMENT', c: 'var(--trans)', i: 'Layer 4: TCP Port Added' },
+            3: { n: 'L3 Header', p: 'PACKET', c: 'var(--net)', i: 'Layer 3: IP Address Added' },
+            2: { n: 'L2 Header', p: 'FRAME', c: 'var(--link)', i: 'Layer 2: MAC Address Added' }
         };
 
         function resolveStep() { if (stepResolver) stepResolver(); }
@@ -57,13 +56,13 @@
 
         async function initDemo() {
             document.getElementById('runBtn').style.display = 'none';
-            document.getElementById('stepBtn').style.display = 'inline-block';
+            document.getElementById('stepBtn').style.visibility = 'visible';
             document.getElementById('packet-container').innerHTML = '';
             
             // SENDER
             setNode('node-pc');
             for (let l of [7, 4, 3, 2]) {
-                updateUI(layers[l].p, `Sender: Adding ${layers[l].n}`);
+                updateUI(layers[l].p, `ACTION: Encapsulating ${layers[l].i}. [Click Next Step]`);
                 const div = document.createElement('div');
                 div.className = 'header-block'; div.id = 'block-' + l;
                 div.style.background = layers[l].c; div.innerText = layers[l].n;
@@ -73,32 +72,31 @@
 
             // SWITCH
             setNode('node-sw');
-            updateUI('FRAME', "Switch: Reading MAC Address (L2). Packet remains sealed.");
+            updateUI('FRAME', "SWITCH: Analyzing L2 MAC Address. No change to PDU. [Click Next Step]");
             await waitForClick();
 
             // ROUTER
             setNode('node-rt');
-            updateUI('PACKET', "Router: Stripping L2 Frame to see L3 IP Address.");
+            updateUI('PACKET', "ROUTER: Stripping L2 Frame to inspect L3 IP Packet. [Click Next Step]");
             document.getElementById('block-2').style.opacity = '0.1';
             await waitForClick();
 
-            updateUI('FRAME', "Router: Re-wrapping with NEW L2 Header for LAN B.");
+            updateUI('FRAME', "ROUTER: Re-encapsulating with NEW L2 MAC Header. [Click Next Step]");
             document.getElementById('block-2').style.opacity = '1';
             document.getElementById('block-2').innerText = "New L2 Header";
-            await wait(200);
             await waitForClick();
 
             // RECEIVER
             setNode('node-srv');
             for (let l of [2, 3, 4]) {
-                updateUI(layers[l].p, `Receiver: Stripping ${layers[l].n}`);
+                updateUI(layers[l].p, `RECEIVER: De-encapsulating ${layers[l].n}. [Click Next Step]`);
                 document.getElementById('block-' + l).remove();
                 await waitForClick();
             }
 
-            updateUI('DATA', "Success! Message Delivered.");
+            updateUI('DATA', "SUCCESS: Data delivered to Application! [Click Start to Reset]");
             document.getElementById('runBtn').style.display = 'inline-block';
-            document.getElementById('stepBtn').style.display = 'none';
+            document.getElementById('stepBtn').style.visibility = 'hidden';
         }
 
         function setNode(id) {
@@ -106,7 +104,7 @@
             document.getElementById(id).classList.add('active-node');
         }
         function updateUI(p, a) {
-            document.getElementById('pdu-name').innerText = "PDU: " + p;
+            document.getElementById('pdu-name').innerText = "PDU TYPE: " + p;
             document.getElementById('pdu-action').innerText = a;
         }
     </script>
