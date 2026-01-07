@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructor Tool: OSI & Device Interaction</title>
+    <style>
+        :root {
+            --app: #ff6b6b; --trans: #4ecdc4; --net: #45b7d1;
+            --link: #96ceb4; --phys: #ffeead; --dark: #2c3e50;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        
+        /* Topology Section */
+        .topology { 
+            display: flex; align-items: center; justify-content: space-around; 
+            width: 950px; height: 160px; background: white; border-radius: 12px; 
+            padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px;
+            position: relative;
+        }
+        .wire-bg { position: absolute; top: 50%; left: 10%; right: 10%; height: 4px; background: #bdc3c7; z-index: 1; }
+        .node { 
+            width: 100px; height: 100px; background: var(--dark); color: white; border-radius: 8px; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            text-align: center; font-size: 0.85em; z-index: 2; border: 4px solid transparent; transition: 0.3s;
+        }
+        .router-node { border-radius: 50%; width: 110px; height: 110px; }
+        .active-node { border-color: #f39c12; box-shadow: 0 0 20px #f39c12; transform: scale(1.05); }
+
+        /* PDU Inspection Display */
+        #inspector { 
+            width: 950px; background: white; border-radius: 10px; padding: 20px; 
+            border-top: 8px solid var(--dark); box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .status-area { text-align: center; margin-bottom: 20px; height: 80px; }
+        .pdu-title { font-size: 1.5em; font-weight: bold; color: #2980b9; }
+        .pdu-desc { color: #7f8c8d; font-style: italic; }
+
+        .header-stack { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 60px; }
+        .header-block { 
+            padding: 12px 18px; border: 2px solid #333; border-radius: 5px; 
+            font-weight: bold; animation: popIn 0.4s ease-out; position: relative;
+        }
+        @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* Controls */
+        .controls { margin-top: 30px; }
+        button { 
+            padding: 15px 50px; font-size: 1.2em; background: var(--dark); color: white; 
+            border: none; border-radius: 8px; cursor: pointer; transition: 0.2s;
+        }
+        button:hover { background: #34495e; }
+        button:disabled { background: #95a5a6; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <h1 style="color: #2c3e50;">Chapter 1: Data Flow & Device Functions</h1>
+
+    <div class="topology">
+        <div class="wire-bg"></div>
+        <div class="node" id="node-pc"><strong>SENDER</strong><br>PC (LAN A)</div>
+        <div class="node" id="node-sw"><strong>SWITCH</strong><br>Layer 2</div>
+        <div class="node router-node" id="node-rt"><strong>ROUTER</strong><br>Layer 3</div>
+        <div class="node" id="node-srv"><strong>RECEIVER</strong><br>Server (LAN B)</div>
+    </div>
+
+    <div id="inspector">
+        <div class="status-area">
+            <div id="pdu-name" class="pdu-title">Ready...</div>
+            <div id="pdu-action" class="pdu-desc">Click start to demonstrate encapsulation.</div>
+        </div>
+        <div class="header-stack" id="packet-container">
+            </div>
+    </div>
+
+    <div class="controls">
+        <button id="runBtn" onclick="runLectureDemo()">Start Transmission</button>
+    </div>
+
+    <script>
+        const pduName = document.getElementById('pdu-name');
+        const pduAction = document.getElementById('pdu-action');
+        const container = document.getElementById('packet-container');
+        const btn = document.getElementById('runBtn');
+
+        const layers = {
+            7: { name: 'Data', pdu: 'DATA', color: 'var(--app)', info: 'Original Message' },
+            4: { name: 'L4 Header', pdu: 'SEGMENT', color: 'var(--trans)', info: 'TCP Port Numbers Added' },
+            3: { name: 'L3 Header', pdu: 'PACKET', color: 'var(--net)', info: 'IP Addresses Added (Routing)' },
+            2: { name: 'L2 Header', pdu: 'FRAME', color: 'var(--link)', info: 'MAC Addresses Added (Switching)' }
+        };
+
+        const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+        async function runLectureDemo() {
+            btn.disabled = true;
+            container.innerHTML = '';
+            resetNodes();
+
+            // 1. SENDER ENCAPSULATION
+            setNode('node-pc');
+            for (let l of [7, 4, 3, 2]) {
+                pduName.innerText = `PDU TYPE: ${layers[l].pdu}`;
+                pduAction.innerText = `Sender adding ${layers[l].name}: ${layers[l].info}`;
+                addBlock(l);
+                await wait(1000);
+            }
+
+            // 2. SWITCH INTERACTION
+            setNode('node-sw');
+            pduName.innerText = "PDU TYPE: FRAME";
+            pduAction.innerText = "Switch looks at L2 Header only. It does not open the Packet.";
+            await wait(2000);
+
+            // 3. ROUTER INTERACTION (The "Big Lesson")
+            setNode('node-rt');
+            pduName.innerText = "PDU TYPE: PACKET (Unwrapped)";
+            pduAction.innerText = "Router STRIPS the L2 Frame to read the L3 IP Packet.";
+            const l2Block = document.getElementById('block-2');
+            l2Block.style.opacity = '0.2';
+            l2Block.style.transform = 'translateY(-20px)';
+            await wait(1500);
+
+            pduAction.innerText = "Router identifies destination and builds a NEW L2 Frame.";
+            l2Block.style.opacity = '1';
+            l2Block.style.transform = 'translateY(0)';
+            l2Block.innerText = "New L2 Header";
+            pduName.innerText = "PDU TYPE: FRAME (Re-wrapped)";
+            await wait(2000);
+
+            // 4. RECEIVER DE-ENCAPSULATION
+            setNode('node-srv');
+            for (let l of [2, 3, 4]) {
+                pduName.innerText = `PDU TYPE: ${layers[l].pdu}`;
+                pduAction.innerText = `Receiver stripping ${layers[l].name}...`;
+                document.getElementById('block-'+l).remove();
+                await wait(1000);
+            }
+
+            pduName.innerText = "MESSAGE DELIVERED";
+            pduAction.innerText = "Original Data reached the Application layer.";
+            resetNodes();
+            btn.disabled = false;
+        }
+
+        function addBlock(l) {
+            const div = document.createElement('div');
+            div.className = 'header-block';
+            div.id = 'block-' + l;
+            div.style.background = layers[l].color;
+            div.innerText = layers[l].name;
+            container.insertBefore(div, container.firstChild);
+        }
+
+        function setNode(id) {
+            resetNodes();
+            document.getElementById(id).classList.add('active-node');
+        }
+
+        function resetNodes() {
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('active-node'));
+        }
+    </script>
+</body>
+</html>
